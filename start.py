@@ -5,6 +5,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -253,17 +254,24 @@ def run_email_module() -> None:
         print(f"Missing theHarvester directory: {THEHARVESTER_DIR}")
         return
 
-    domain = input("Target domain (e.g. example.com): ").strip()
+    target = input("Target domain or email (e.g. example.com or user@example.com): ").strip()
+    if not target:
+        print("Domain or email is required.")
+        return
+
+    domain = target.split("@", 1)[1] if "@" in target else target
+    domain = domain.strip()
     if not domain:
-        print("Domain is required.")
+        print("Could not determine a valid domain.")
         return
 
     source = input("Source engine (blank = bing): ").strip() or "bing"
     limit_raw = input("Result limit (blank = 100): ").strip() or "100"
     limit = limit_raw if limit_raw.isdigit() else "100"
 
+    python_cmd = sys.executable or shutil.which("python") or shutil.which("py") or "python"
     cmd = [
-        shutil.which("python3") or shutil.which("python") or "python",
+        python_cmd,
         "-m",
         "theHarvester.theHarvester",
         "-d", domain,
@@ -286,6 +294,7 @@ def run_email_module() -> None:
             emails_found += 1
 
     print("\nSummary:")
+    print(f"  Target      : {domain}")
     print(f"  Return code : {result.returncode}")
     print(f"  Emails seen : {emails_found}")
 
