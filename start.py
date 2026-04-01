@@ -185,10 +185,17 @@ def username_lookup(username: str, limit: int | None = None) -> list[dict[str, A
     return results
 
 
+def safe_name(value: str) -> str:
+    value = value.strip().replace("@", "_at_")
+    value = re.sub(r"[^a-zA-Z0-9._-]+", "_", value)
+    value = re.sub(r"_+", "_", value)
+    return value.strip("._") or "report"
+
+
 def save_report(name: str, kind: str, results: Any) -> Path:
     OUTPUT_DIR.mkdir(exist_ok=True)
     suffix = "json" if isinstance(results, (dict, list)) else "txt"
-    path = OUTPUT_DIR / f"{kind}-{name}.{suffix}"
+    path = OUTPUT_DIR / f"{kind}-{safe_name(name)}.{suffix}"
     if suffix == "json":
         path.write_text(json.dumps(results, indent=2), encoding="utf-8")
     else:
@@ -291,6 +298,7 @@ def run_email_module() -> None:
         print("Domain or email is required.")
         return
 
+    original_target = target
     domain = target.split("@", 1)[1] if "@" in target else target
     domain = domain.strip()
     if not domain:
@@ -346,7 +354,7 @@ def run_email_module() -> None:
         elif stderr:
             print(stderr)
 
-    report_path = save_report(domain, "email", stdout + "\n\nSTDERR:\n" + stderr)
+    report_path = save_report(original_target, "email", stdout + "\n\nSTDERR:\n" + stderr)
     print(f"  Output file : {report_path.name}")
     print(f"\nSaved report: {report_path}")
 
