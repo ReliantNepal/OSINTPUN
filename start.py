@@ -305,7 +305,8 @@ def run_email_module() -> None:
         print("Could not determine a valid domain.")
         return
 
-    source = input("Source engine (blank = bing): ").strip() or "bing"
+    print("Available source examples: bing, google, yahoo, all")
+    source = input("Source engine (blank = bing): ").strip().lower() or "bing"
     limit_raw = input("Result limit (blank = 100): ").strip() or "100"
     limit = limit_raw if limit_raw.isdigit() else "100"
 
@@ -328,15 +329,26 @@ def run_email_module() -> None:
     print(stdout)
 
     emails_found = 0
+    host_lines = 0
     for line in stdout.splitlines():
-        lower = line.lower()
+        lower = line.lower().strip()
         if "@" in line and not lower.startswith("[*]"):
             emails_found += 1
+        if lower.startswith("[*] hosts found") or lower.startswith("[*] searching"):
+            host_lines += 1
 
     print("\nSummary:")
     print(f"  Target      : {domain}")
+    print(f"  Source      : {source}")
     print(f"  Return code : {result.returncode}")
     print(f"  Emails seen : {emails_found}")
+
+    if result.returncode == 0 and emails_found == 0:
+        print("\nInterpretation:")
+        print("  No public email results were returned for this domain from the selected source.")
+        print("  This does not necessarily mean the tool failed.")
+        print("  It may simply mean the domain has little public email exposure or the chosen source found nothing.")
+        print("  Try another source such as: all, google, yahoo, or bing.")
 
     if result.returncode != 0:
         print("theHarvester returned a non-zero exit code.")
