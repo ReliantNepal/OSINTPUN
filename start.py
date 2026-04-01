@@ -5,6 +5,8 @@ import json
 import re
 import shutil
 import subprocess
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,33 @@ THEHARVESTER_DIR = ROOT / "resources" / "theHarvester"
 OUTPUT_DIR = ROOT / "output"
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36"
 TIMEOUT = 15
+
+
+class Spinner:
+    def __init__(self, message: str = "Working") -> None:
+        self.message = message
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def _run(self) -> None:
+        frames = ["|", "/", "-", "\\"]
+        i = 0
+        while not self._stop.is_set():
+            print(f"\r{self.message} {frames[i % len(frames)]}", end="", flush=True)
+            i += 1
+            time.sleep(0.12)
+        print(f"\r{self.message} done.{' ' * 12}")
+
+    def __enter__(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=1)
+
 
 
 def load_site_data() -> dict[str, dict[str, Any]]:
@@ -183,8 +212,9 @@ def main() -> None:
     subset = input("Limit sites for quick test? (blank = all, number = limit): ").strip()
     limit = int(subset) if subset.isdigit() else None
 
-    print("\nRunning username checks...\n")
-    results = username_lookup(username, limit=limit)
+    print()
+    with Spinner("Running username checks"):
+        results = username_lookup(username, limit=limit)
     print_results(results)
     report_path = save_report(username, results)
     print(f"\nSaved report: {report_path}")
