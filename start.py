@@ -171,12 +171,16 @@ def username_lookup(username: str, limit: int | None = None) -> list[dict[str, A
     if limit:
         items = items[:limit]
 
+    total = len(items)
+    completed = 0
     results: list[dict[str, Any]] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(20, max(1, len(items)))) as executor:
         futures = [executor.submit(probe_site, site_name, username, site_info) for site_name, site_info in items]
         for future in concurrent.futures.as_completed(futures):
             results.append(future.result())
-
+            completed += 1
+            print(f"\rProgress: {completed}/{total} sites checked", end="", flush=True)
+    print()
     results.sort(key=lambda item: (not item["exists"], item["site"].lower()))
     return results
 
@@ -190,11 +194,23 @@ def save_report(username: str, results: list[dict[str, Any]]) -> Path:
 
 def print_results(results: list[dict[str, Any]]) -> None:
     found = [r for r in results if r["exists"]]
-    print(f"\nFound {len(found)} matching profiles.\n")
-    for item in found:
-        print(f"[FOUND] {item['site']}: {item['url']}")
-
     errors = [r for r in results if r.get("error") and r.get("error") != "illegal_username_for_site"]
+    illegal = [r for r in results if r.get("error") == "illegal_username_for_site"]
+    checked = len(results)
+
+    print(f"\nSummary:")
+    print(f"  Checked : {checked}")
+    print(f"  Found   : {len(found)}")
+    print(f"  Errors  : {len(errors)}")
+    print(f"  Skipped : {len(illegal)}")
+
+    if found:
+        print("\nFound profiles:\n")
+        for item in found:
+            print(f"[FOUND] {item['site']}: {item['url']}")
+    else:
+        print("\nNo matching public profiles found.")
+
     if errors:
         print(f"\n{len(errors)} sites returned request errors (not necessarily failures).")
 
