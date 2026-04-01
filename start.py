@@ -300,7 +300,18 @@ def run_email_module() -> None:
 
     if result.returncode != 0:
         print("theHarvester returned a non-zero exit code.")
-        if stderr:
+        if "ModuleNotFoundError:" in stderr:
+            missing = None
+            for line in stderr.splitlines():
+                if "ModuleNotFoundError:" in line and "No module named" in line:
+                    missing = line.split("No module named ", 1)[1].strip().replace("'", "").replace(chr(34), "")
+                    break
+            if missing:
+                print(f"Missing dependency detected: {missing}")
+                print("Install theHarvester dependencies with:")
+                print(r"  python -m pip install .\resources\theHarvester")
+            print(stderr)
+        elif stderr:
             print(stderr)
 
     report_path = save_report(domain, "email", stdout + "\n\nSTDERR:\n" + stderr)
