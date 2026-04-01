@@ -245,6 +245,36 @@ def run_username_module() -> None:
     print(f"\nSaved report: {report_path}")
 
 
+
+
+def ensure_theharvester_ready() -> bool:
+    python_cmd = sys.executable or shutil.which("python") or shutil.which("py") or "python"
+    probe = subprocess.run(
+        [python_cmd, "-c", "import netaddr, aiohttp, aiodns"],
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode == 0:
+        return True
+
+    print("theHarvester dependencies appear to be missing.")
+    answer = input("Install them now? (y/n): ").strip().lower()
+    if answer not in {"y", "yes"}:
+        return False
+
+    print("\nInstalling theHarvester dependencies...\n")
+    install = subprocess.run(
+        [python_cmd, "-m", "pip", "install", str(THEHARVESTER_DIR)],
+        text=True,
+    )
+    if install.returncode != 0:
+        print("Automatic install failed.")
+        print(r"Run this manually: python -m pip install .\resources\theHarvester")
+        return False
+
+    print("Dependencies installed. Continuing...\n")
+    return True
+
 def run_email_module() -> None:
     print("=" * 48)
     print("OSINTPUN :: Email")
@@ -252,6 +282,8 @@ def run_email_module() -> None:
     print("=" * 48)
     if not THEHARVESTER_DIR.exists():
         print(f"Missing theHarvester directory: {THEHARVESTER_DIR}")
+        return
+    if not ensure_theharvester_ready():
         return
 
     target = input("Target domain or email (e.g. example.com or user@example.com): ").strip()
