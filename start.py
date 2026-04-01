@@ -46,7 +46,6 @@ class Spinner:
             self._thread.join(timeout=1)
 
 
-
 def load_site_data() -> dict[str, dict[str, Any]]:
     raw = json.loads(SHERLOCK_DATA.read_text(encoding="utf-8"))
     raw.pop("$schema", None)
@@ -185,20 +184,24 @@ def username_lookup(username: str, limit: int | None = None) -> list[dict[str, A
     return results
 
 
-def save_report(username: str, results: list[dict[str, Any]]) -> Path:
+def save_report(name: str, kind: str, results: Any) -> Path:
     OUTPUT_DIR.mkdir(exist_ok=True)
-    path = OUTPUT_DIR / f"username-{username}.json"
-    path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    suffix = "json" if isinstance(results, (dict, list)) else "txt"
+    path = OUTPUT_DIR / f"{kind}-{name}.{suffix}"
+    if suffix == "json":
+        path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    else:
+        path.write_text(str(results), encoding="utf-8")
     return path
 
 
-def print_results(results: list[dict[str, Any]]) -> None:
+def print_username_results(results: list[dict[str, Any]]) -> None:
     found = [r for r in results if r["exists"]]
     errors = [r for r in results if r.get("error") and r.get("error") != "illegal_username_for_site"]
     illegal = [r for r in results if r.get("error") == "illegal_username_for_site"]
     checked = len(results)
 
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  Checked : {checked}")
     print(f"  Found   : {len(found)}")
     print(f"  Errors  : {len(errors)}")
@@ -215,25 +218,102 @@ def print_results(results: list[dict[str, Any]]) -> None:
         print(f"\n{len(errors)} sites returned request errors (not necessarily failures).")
 
 
-def main() -> None:
+def run_username_module() -> None:
     print("=" * 48)
     print("OSINTPUN :: Username")
     print("Manifest-driven public profile lookup")
     print("=" * 48)
+    if not SHERLOCK_DATA.exists():
+        print(f"Missing Sherlock data file: {SHERLOCK_DATA}")
+        print("Please re-download the repo or ensure resources/sherlock is present.")
+        return
+
     username = input("Username to search: ").strip()
     if not username:
         print("Username is required.")
         return
 
-    subset = input("Limit sites for quick test? (blank = all, number = limit): ").strip()
+    subset = input("Limit sites for quick test? (blank/all = all, number = limit): ").strip().lower()
     limit = int(subset) if subset.isdigit() else None
 
     print()
     with Spinner("Running username checks"):
         results = username_lookup(username, limit=limit)
-    print_results(results)
-    report_path = save_report(username, results)
+    print_username_results(results)
+    report_path = save_report(username, "username", results)
     print(f"\nSaved report: {report_path}")
+
+
+def run_email_module() -> None:
+    print("=" * 48)
+    print("OSINTPUN :: Email")
+    print("theHarvester wrapper")
+    print("=" * 48)
+    if not THEHARVESTER_DIR.exists():
+        print(f"Missing theHarvester directory: {THEHARVESTER_DIR}")
+        return
+
+    domain = input("Target domain (e.g. example.com): ").strip()
+    if not domain:
+        print("Domain is required.")
+        return
+
+    source = input("Source engine (blank = bing): ").strip() or "bing"
+    limit_raw = input("Result limit (blank = 100): ").strip() or "100"
+    limit = limit_raw if limit_raw.isdigit() else "100"
+
+    cmd = [
+        shutil.which("python3") or shutil.which("python") or "python",
+        "-m",
+        "theHarvester.theHarvester",
+        "-d", domain,
+        "-b", source,
+        "-l", limit,
+    ]
+
+    print()
+    with Spinner("Running theHarvester"):
+        result = subprocess.run(cmd, cwd=str(THEHARVESTER_DIR), capture_output=True, text=True)
+
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+    print(stdout)
+
+    emails_found = 0
+    for line in stdout.splitlines():
+        lower = line.lower()
+        if "@" in line and not lower.startswith("[*]"):
+            emails_found += 1
+
+    print("\nSummary:")
+    print(f"  Return code : {result.returncode}")
+    print(f"  Emails seen : {emails_found}")
+
+    if result.returncode != 0:
+        print("theHarvester returned a non-zero exit code.")
+        if stderr:
+            print(stderr)
+
+    report_path = save_report(domain, "email", stdout + "\n\nSTDERR:\n" + stderr)
+    print(f"  Output file : {report_path.name}")
+    print(f"\nSaved report: {report_path}")
+
+
+def main() -> None:
+    print("=" * 48)
+    print("OSINTPUN")
+    print("Single-file OSINT starter")
+    print("=" * 48)
+    print("1. Username")
+    print("2. Email / Domain")
+    choice = input("Select option (1/2): ").strip()
+    if choice == "1":
+        run_username_module()
+        return
+    if choice == "2":
+        run_email_module()
+        return
+    print("Invalid choice. Use 1 or 2.")
 
 
 if __name__ == "__main__":
