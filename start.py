@@ -3,6 +3,8 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +12,7 @@ import requests
 
 ROOT = Path(__file__).resolve().parent
 SHERLOCK_DATA = ROOT / "resources" / "sherlock" / "sherlock_project" / "resources" / "data.json"
+THEHARVESTER_DIR = ROOT / "resources" / "theHarvester"
 OUTPUT_DIR = ROOT / "output"
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36"
 TIMEOUT = 15
