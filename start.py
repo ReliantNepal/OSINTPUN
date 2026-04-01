@@ -46,6 +46,16 @@ def build_headers(site_info: dict[str, Any]) -> dict[str, str]:
     return headers
 
 
+def any_match(marker: Any, text: str) -> bool:
+    if not marker:
+        return False
+    if isinstance(marker, str):
+        return marker in text
+    if isinstance(marker, list):
+        return any(isinstance(item, str) and item in text for item in marker)
+    return False
+
+
 def evaluate_response(site_name: str, username: str, site_info: dict[str, Any], response: requests.Response | None, error: str | None) -> dict[str, Any]:
     profile_url = interpolate(site_info.get("url", ""), username)
     result = {
@@ -71,9 +81,9 @@ def evaluate_response(site_name: str, username: str, site_info: dict[str, Any], 
         text = response.text or ""
         error_msg = site_info.get("errorMsg")
         error_msg2 = site_info.get("errorMsg2")
-        if error_msg and error_msg in text:
+        if any_match(error_msg, text):
             result["exists"] = False
-        elif error_msg2 and error_msg2 in text:
+        elif any_match(error_msg2, text):
             result["exists"] = False
         else:
             result["exists"] = response.status_code == 200
